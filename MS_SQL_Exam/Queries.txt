@@ -1,0 +1,98 @@
+INSERT INTO Boardgames(Name,YearPublished,Rating,CategoryId,PublisherId,PlayersRangeId)
+	VALUES
+		('Deep Blue' ,2019,5.67,1,15,7),
+		('Paris'	,2016	,9.78,7,1,5),
+		('Catan: Starfarers'	,2021	,9.87,7,13,6),
+		('Bleeding Kansas'	,2020	,3.25,3,7,4),
+		('One Small Step'	,2019	,5.75,5,9,2)
+INSERT INTO Publishers(Name,AddressId,Website,Phone)
+	VALUES 
+		('Agman Games',5,'www.agmangames.com',	'+16546135542'),
+		('Amethyst Games',7,'www.amethystgames.com'	,'+15558889992'),
+		('BattleBooks',13,'www.battlebooks.com'	,'+12345678907')
+
+UPDATE PlayersRanges SET PlayersMax = PlayersMax +1 WHERE PlayersMin = 2 AND PlayersMax = 2
+UPDATE Boardgames SET Name = Name+'V2' WHERE YearPublished >=2020
+
+DELETE FROM CreatorsBoardgames WHERE BoardgameId IN (1,16,31,47)
+DELETE FROM Boardgames WHERE PublisherId = 1
+DELETE FROM Publishers WHERE AddressId = 5
+DELETE FROM Addresses WHERE LEFT(TOWN, 1)  = 'L'
+
+SELECT Name, Rating FROM Boardgames
+ORDER BY YearPublished,Name DESC
+
+SELECT Boardgames.Id,Boardgames.Name,Boardgames.YearPublished,Categories.Name AS CategoryName FROM Boardgames
+JOIN Categories ON Boardgames.CategoryId = Categories.Id
+WHERE Categories.Name = 'Strategy Games' OR Categories.Name = 'Wargames'
+ORDER BY YearPublished DESC
+
+SELECT Id,FirstName + ' ' + LastName AS CreatorName,Email FROM Creators
+WHERE Id = 5 OR Id = 7
+
+SELECT TOP(5) b.Name,Rating,c.Name AS CategoryName FROM Boardgames AS b
+JOIN Categories AS c ON b.CategoryId = c.Id
+JOIN PlayersRanges AS pr ON b.PlayersRangeId = pr.Id
+WHERE b.Rating >7.00 AND b.Name LIKE '%a%' 
+OR b.Rating > 7.50 AND pr.PlayersMin =2 AND pr.PlayersMax = 5
+ORDER BY b.Name,Rating DESC 
+
+SELECT FirstName + ' ' + LastName AS 'Full Name',Email,Max(Rating) FROM Creators AS c
+JOIN CreatorsBoardgames AS cb ON c.Id = cb.CreatorId
+JOIN Boardgames AS b ON cb.BoardgameId = b.Id
+WHERE Email LIKE '%.com'  
+GROUP BY c.FirstName,c.LastName,c.Email
+ORDER BY 1 ASC
+
+SELECT LastName,CEILING(AVG(Rating)) AS Rating,p.Name AS PublisherName FROM Creators AS c
+JOIN CreatorsBoardgames AS cb ON c.Id = cb.CreatorId
+JOIN Boardgames AS b ON cb.BoardgameId = b.Id
+JOIN Publishers AS p ON b.PublisherId = p.Id
+WHERE p.Name LIKE 'Stonemaier Games'
+GROUP BY p.Name,c.LastName
+HAVING p.Name = 'Stonemaier Games'
+ORDER BY AVG(Rating) DESC
+
+CREATE FUNCTION udf_CreatorWithBoardgames(@name VARCHAR(30))
+RETURNS INT AS
+BEGIN
+
+    DECLARE @boardGamesCount INT;
+    SET @boardGamesCount = 
+    (
+    SELECT
+    COUNT(cr.Id) 
+    FROM Creators AS cr
+    JOIN CreatorsBoardgames AS cb ON cr.Id = cb.CreatorId
+    WHERE cr.FirstName= @name
+    GROUP BY cr.Id
+    );
+
+    IF @boardGamesCount IS NULL
+    SET @boardGamesCount = 0
+    RETURN @boardGamesCount
+
+    END;
+
+CREATE PROC usp_SearchByCategory(@category VARCHAR(50))
+AS
+BEGIN
+SELECT 
+    b.[Name]
+    ,b.YearPublished
+    ,b.Rating
+    ,cat.[Name] AS CategoryName
+    ,pub.[Name] AS PublisherName
+    ,CAST(pl.PlayersMin AS VARCHAR(50)) + ' people' AS MinPlayers
+    ,CAST(pl.PlayersMax AS VARCHAR(50)) + ' people' AS MaxPlayers
+
+FROM Boardgames AS b
+JOIN Categories AS cat ON b.CategoryId = cat.Id
+JOIN Publishers AS pub ON b.PublisherId = pub.Id
+JOIN PlayersRanges AS pl ON b.PlayersRangeId = pl.Id
+WHERE cat.Name = @category
+
+ORDER BY pub.[Name] ASC,
+b.YearPublished DESC
+
+END
